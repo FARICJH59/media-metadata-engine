@@ -16,7 +16,7 @@ Cloudflare Worker for authenticated audio ingestion, durable object storage, met
 1. Create the R2 bucket `spatial-audio-ingest`.
 2. Create the Queue `audio-processing-queue`.
 3. Create D1 database `media_metadata_db` and replace `YOUR_D1_DATABASE_ID` in `wrangler.toml`.
-4. Apply schema: `npx wrangler d1 migrations apply media_metadata_db --remote`.
+4. For manual setup, apply schema: `npx wrangler d1 migrations apply media_metadata_db --remote`. The manual GitHub deployment workflow applies pending migrations after the production environment gate approves the job and before publishing the Worker.
 5. Set a strong secret: `npx wrangler secret put INGEST_API_TOKEN` (at least 32 characters).
 6. Configure GitHub Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
