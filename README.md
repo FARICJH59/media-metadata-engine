@@ -35,4 +35,6 @@ The v1 authorization model is a single service bearer token, not tenant isolatio
 
 ## Reliability boundary
 
-R2, D1, and Queue do not form one atomic transaction. The handler uses best-effort compensation and records queue dispatch failures; stale `PENDING` rows and orphaned R2 objects require reconciliation. A durable outbox/reconciler is required before high-assurance production use.
+R2, D1, and Queue do not form one atomic transaction. The handler writes metadata and a processing-outbox row in one D1 batch, then attempts immediate queue dispatch. A one-minute scheduled trigger retries `READY` outbox rows after dispatch failures. Queue sends are at-least-once: a send that succeeds before the outbox status update can be repeated, so consumers must remain idempotent. R2/D1 compensation can still leave an orphan if storage or database operations fail during cleanup; reconciliation and monitoring remain necessary before high-assurance production use.
+
+Apply migrations in order, including `migrations/0002_processing_outbox.sql`, before enabling ingestion against the updated Worker.
