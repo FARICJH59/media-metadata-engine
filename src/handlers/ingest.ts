@@ -1,6 +1,6 @@
 import type { Env } from "../types";
 import { hasValidBearer, jsonError, validIdempotencyKey } from "../types";
-import { dispatchReadyOutbox } from "./outbox";
+import { dispatchOutboxForMetadata, dispatchReadyOutbox } from "./outbox";
 
 const AUDIO_TYPE = /^audio\/[a-z0-9.+-]+$/i;
 
@@ -9,6 +9,21 @@ function duplicateResponse(prior: { id: number; file_key: string; status: string
     { success: true, duplicate: true, metadataId: prior.id, fileKey: prior.file_key, status: prior.status },
     { status: 200, headers: { "cache-control": "no-store" } },
   );
+}
+
+async function respondToDuplicate(env: Env, prior: { id: number; file_key: string; status: string }): Promise<Response> {
+  if (prior.status === "PENDING") {
+    try {
+      await dispatchOutboxForMetadata(env, prior.id);
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: "duplicate_outbox_recovery_deferred",
+        metadataId: prior.id,
+        error: error instanceof Error ? error.message : "unknown",
+      }));
+    }
+  }
+  return duplicateResponse(prior);
 }
 
 export async function handleIngest(request: Request, env: Env): Promise<Response> {
@@ -44,7 +59,7 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
   ).bind(idempotencyKey).first<{ id: number; file_key: string; status: string }>();
 
   const prior = await findPrior();
-  if (prior) return duplicateResponse(prior);
+  if (prior) return respondToDuplicate(env, prior);
 
   const fileKey = `ingest/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}`;
   let objectStored = false;
@@ -111,7 +126,7 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
             console.error(JSON.stringify({ event: "ingest_orphan_cleanup_failed", requestId, fileKey }));
           }
         }
-        return duplicateResponse(concurrent);
+        return respondToDuplicate(env, concurrent);
       }
     } catch {
       // Preserve the original failure; reconciliation must detect any orphaned object.
