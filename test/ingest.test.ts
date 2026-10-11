@@ -21,6 +21,9 @@ function makeEnv() {
     bind: (...args: unknown[]) => ({
       sql, args,
       first: vi.fn(async () => {
+        if (sql.includes("FROM processing_outbox WHERE metadata_id")) {
+          return outbox.find(row => row.metadata_id === args[0] && row.status === "READY") ?? null;
+        }
         if (sql.includes("SELECT id, file_key, status")) return rows.get(String(args[0])) ?? null;
         if (sql.includes("SELECT id, status FROM metadata")) {
           const row = rows.get(String(args[0]));
@@ -101,6 +104,11 @@ describe("handleIngest", () => {
     expect(ctx.put).not.toHaveBeenCalled();
   });
 
+  it("accepts a case-insensitive Bearer authorization scheme", async () => {
+    const response = await handleIngest(makeRequest({ authorization: `bEaReR ${token}`, length: "5", idempotency: "request-123" }), ctx.env);
+    expect(response.status).toBe(202);
+  });
+
   it("rejects non-audio content", async () => {
     const response = await handleIngest(makeRequest({ authorization: `Bearer ${token}`, contentType: "text/plain", length: "5", idempotency: "request-123" }), ctx.env);
     expect(response.status).toBe(415);
@@ -139,6 +147,16 @@ describe("handleIngest", () => {
     const response = await handleIngest(makeRequest({ authorization: `Bearer ${token}`, length: "5", idempotency: "request-123" }), ctx.env);
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ duplicate: true, metadataId: 3, fileKey: "ingest/existing.wav" });
+    expect(ctx.put).not.toHaveBeenCalled();
+  });
+
+  it("retries dispatch for an existing pending idempotency record", async () => {
+    ctx.rows.set("request-123", { id: 3, file_key: "ingest/existing.wav", status: "PENDING" });
+    ctx.outbox.push({ id: 1, metadata_id: 3, file_key: "ingest/existing.wav", request_id: "prior-request", status: "READY" });
+    const response = await handleIngest(makeRequest({ authorization: `Bearer ${token}`, length: "5", idempotency: "request-123" }), ctx.env);
+    expect(response.status).toBe(200);
+    expect(ctx.send).toHaveBeenCalledOnce();
+    expect(ctx.outbox[0].status).toBe("ENQUEUED");
     expect(ctx.put).not.toHaveBeenCalled();
   });
 
