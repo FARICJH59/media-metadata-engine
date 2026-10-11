@@ -15,7 +15,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - name: Install dependencies
         run: npm install
       - name: Type check
@@ -28,7 +27,6 @@ jobs:
             echo "::error::Replace the D1 database ID in wrangler.toml before deploying."
             exit 1
           fi
-          test -n "${CLOUDFLARE_API_TOKEN:-}" || true
 
   deploy:
     needs: verify
