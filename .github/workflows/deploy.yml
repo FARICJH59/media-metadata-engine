@@ -2,25 +2,45 @@ name: Deploy Cloudflare Worker
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  deploy:
+  verify:
     runs-on: ubuntu-latest
-    name: Deploy to Cloudflare Edge
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-
-      - name: Install Dependencies
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
         run: npm install
+      - name: Type check
+        run: npm run check
+      - name: Tests
+        run: npm test
+      - name: Validate deployment configuration
+        run: |
+          if grep -q 'YOUR_D1_DATABASE_ID' wrangler.toml; then
+            echo "::error::Replace the D1 database ID in wrangler.toml before deploying."
+            exit 1
+          fi
+          test -n "${CLOUDFLARE_API_TOKEN:-}" || true
 
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
       - name: Publish Worker to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
