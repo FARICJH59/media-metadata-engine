@@ -20,7 +20,7 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
     return jsonError("Unsupported content type; an audio/* type is required", 415, requestId);
   }
   const rawLength = request.headers.get("content-length");
-  if (!rawLength || !/^\\d+$/.test(rawLength)) {
+  if (!rawLength || !/^\d+$/.test(rawLength)) {
     return jsonError("A valid Content-Length header is required", 411, requestId);
   }
   const declaredSize = Number(rawLength);
