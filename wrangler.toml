@@ -24,3 +24,6 @@ database_id = "YOUR_D1_DATABASE_ID"
 
 [vars]
 MAX_UPLOAD_BYTES = "26214400"
+
+[triggers]
+crons = ["* * * * *"]
