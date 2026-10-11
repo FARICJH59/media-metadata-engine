@@ -4,6 +4,12 @@
   "private": true,
   "description": "Edge-native spatial audio ingestion and metadata pipeline",
   "main": "src/index.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FARICJH59/media-metadata-engine.git"
+  },
+  "author": "Tech Fusion AI ML LLC",
+  "license": "ISC",
   "scripts": {
     "dev": "wrangler dev",
     "check": "tsc --noEmit",
