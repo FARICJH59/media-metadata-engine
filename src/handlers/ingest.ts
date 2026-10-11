@@ -1,7 +1,7 @@
 import type { Env, ProcessingMessage } from "../types";
 import { hasValidBearer, jsonError, validIdempotencyKey } from "../types";
 
-const AUDIO_TYPE = /^audio\\/[a-z0-9.+-]+$/i;
+const AUDIO_TYPE = /^audio\/[a-z0-9.+-]+$/i;
 
 function duplicateResponse(prior: { id: number; file_key: string; status: string }): Response {
   return Response.json(
