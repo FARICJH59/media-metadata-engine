@@ -1,5 +1,6 @@
-import type { Env, ProcessingMessage } from "../types";
+import type { Env } from "../types";
 import { hasValidBearer, jsonError, validIdempotencyKey } from "../types";
+import { dispatchReadyOutbox } from "./outbox";
 
 const AUDIO_TYPE = /^audio\/[a-z0-9.+-]+$/i;
 
@@ -66,23 +67,34 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
       return jsonError("Audio payload exceeds the configured upload limit", 413, requestId);
     }
 
+    // D1 batches are transactional: metadata and its outbox event commit together.
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO metadata (file_key, file_size, content_type, status, idempotency_key, request_id) VALUES (?, ?, ?, 'PENDING', ?, ?)",
+      ).bind(fileKey, stored.size, contentType, idempotencyKey, requestId),
+      env.DB.prepare(
+        "INSERT INTO processing_outbox (metadata_id, file_key, request_id) SELECT id, ?, ? FROM metadata WHERE idempotency_key = ? ON CONFLICT(metadata_id) DO NOTHING",
+      ).bind(fileKey, requestId, idempotencyKey),
+    ]);
     const inserted = await env.DB.prepare(
-      "INSERT INTO metadata (file_key, file_size, content_type, status, idempotency_key, request_id) VALUES (?, ?, ?, 'PENDING', ?, ?) RETURNING id",
-    ).bind(fileKey, stored.size, contentType, idempotencyKey, requestId).first<{ id: number }>();
-    if (!inserted?.id) throw new Error("D1 insert did not return an ID");
+      "SELECT id, status FROM metadata WHERE idempotency_key = ?",
+    ).bind(idempotencyKey).first<{ id: number; status: string }>();
+    if (!inserted?.id) throw new Error("D1 transaction did not persist metadata and outbox");
 
-    const message: ProcessingMessage = { fileKey, metadataId: inserted.id, requestId };
+    // Best-effort immediate dispatch improves latency. A scheduled retry handles failures.
     try {
-      await env.PROCESSING_QUEUE.send(message, { contentType: "json" });
-    } catch {
-      await env.DB.prepare(
-        "UPDATE metadata SET error_code = 'QUEUE_ENQUEUE_FAILED', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDING'",
-      ).bind(inserted.id).run();
-      return jsonError("Audio stored but queue dispatch failed; reconciliation is required", 503, requestId);
+      await dispatchReadyOutbox(env, 25);
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: "outbox_dispatch_deferred",
+        requestId,
+        metadataId: inserted.id,
+        error: error instanceof Error ? error.message : "unknown",
+      }));
     }
 
     return Response.json(
-      { success: true, message: "Audio accepted for processing", fileKey, metadataId: inserted.id, status: "PENDING", requestId },
+      { success: true, message: "Audio accepted for processing", fileKey, metadataId: inserted.id, status: inserted.status, requestId },
       { status: 202, headers: { "cache-control": "no-store" } },
     );
   } catch (error) {
