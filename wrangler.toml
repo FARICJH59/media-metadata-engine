@@ -1,0 +1,23 @@
+name = "media-metadata-engine"
+main = "src/index.ts"
+compatibility_date = "2026-03-01"
+
+# Cloudflare R2 Bucket Binding (Audio Storage)
+[[r2_buckets]]
+binding = "AUDIO_BUCKET"
+bucket_name = "spatial-audio-ingest"
+
+# Cloudflare Queue Binding (Asynchronous Ingestion Jobs)
+[[queues.producers]]
+queue = "audio-processing-queue"
+binding = "PROCESSING_QUEUE"
+
+[[queues.consumers]]
+queue = "audio-processing-queue"
+max_batch_size = 10
+
+# Cloudflare D1 Database Binding (Metadata Store)
+[[d1_databases]]
+binding = "DB"
+database_name = "media_metadata_db"
+database_id = "YOUR_D1_DATABASE_ID"
