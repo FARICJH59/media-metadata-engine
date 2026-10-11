@@ -38,9 +38,9 @@ export function hasValidBearer(request: Request, env: Env): boolean {
   const configured = env.INGEST_API_TOKEN;
   if (!configured || configured.length < 32) return false;
   const header = request.headers.get("authorization") ?? "";
-  const prefix = "Bearer ";
-  if (!header.startsWith(prefix)) return false;
-  const supplied = header.slice(prefix.length);
+  const match = /^Bearer (.+)$/i.exec(header);
+  if (!match) return false;
+  const supplied = match[1];
   if (supplied.length !== configured.length) return false;
   let difference = 0;
   for (let i = 0; i < configured.length; i++) {
