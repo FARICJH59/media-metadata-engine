@@ -1,13 +1,12 @@
 name = "media-metadata-engine"
 main = "src/index.ts"
-compatibility_date = "2026-03-01"
+compatibility_date = "2026-10-02"
 
-# Cloudflare R2 Bucket Binding (Audio Storage)
+# Configure a real database ID before deployment. CI rejects this placeholder.
 [[r2_buckets]]
 binding = "AUDIO_BUCKET"
 bucket_name = "spatial-audio-ingest"
 
-# Cloudflare Queue Binding (Asynchronous Ingestion Jobs)
 [[queues.producers]]
 queue = "audio-processing-queue"
 binding = "PROCESSING_QUEUE"
@@ -15,9 +14,16 @@ binding = "PROCESSING_QUEUE"
 [[queues.consumers]]
 queue = "audio-processing-queue"
 max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
 
-# Cloudflare D1 Database Binding (Metadata Store)
 [[d1_databases]]
 binding = "DB"
 database_name = "media_metadata_db"
 database_id = "YOUR_D1_DATABASE_ID"
+
+[vars]
+MAX_UPLOAD_BYTES = "26214400"
+
+[triggers]
+crons = ["* * * * *"]

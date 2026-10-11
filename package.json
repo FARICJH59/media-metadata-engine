@@ -1,15 +1,25 @@
 {
   "name": "media-metadata-engine",
-  "version": "1.0.0",
-  "description": "Edge-native spatial audio processing pipeline",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Edge-native spatial audio ingestion and metadata pipeline",
   "main": "src/index.ts",
-  "scripts": {
-    "deploy": "wrangler deploy"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/FARICJH59/media-metadata-engine.git"
   },
   "author": "Tech Fusion AI ML LLC",
-  "license": "ISC"
+  "license": "ISC",
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261011.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.40.0"
+  }
 }
