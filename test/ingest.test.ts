@@ -46,16 +46,23 @@ function makeEnv() {
 }
 
 function makeRequest(overrides: { method?: string; authorization?: string; contentType?: string; length?: string; idempotency?: string; body?: string } = {}): Request {
-  return new Request("https://example.test/ingest", {
+  const headerValues: Record<string, string> = {
+    ...(overrides.authorization ? { authorization: overrides.authorization } : {}),
+    "content-type": overrides.contentType ?? "audio/wav",
+    ...(overrides.length ? { "content-length": overrides.length } : {}),
+    ...(overrides.idempotency ? { "idempotency-key": overrides.idempotency } : {}),
+  };
+  const request = new Request("https://example.test/ingest", {
     method: overrides.method ?? "POST",
-    headers: {
-      ...(overrides.authorization ? { authorization: overrides.authorization } : {}),
-      "content-type": overrides.contentType ?? "audio/wav",
-      ...(overrides.length ? { "content-length": overrides.length } : {}),
-      ...(overrides.idempotency ? { "idempotency-key": overrides.idempotency } : {}),
-    },
+    headers: Object.fromEntries(Object.entries(headerValues).filter(([name]) => name !== "content-length")),
     body: overrides.body ?? "audio",
   });
+  // Fetch implementations may strip Content-Length because it is a transport-managed header.
+  // Override only the test request's header accessor to exercise Worker validation deterministically.
+  Object.defineProperty(request, "headers", {
+    value: { get: (name: string) => headerValues[name.toLowerCase()] ?? null },
+  });
+  return request;
 }
 
 describe("handleIngest", () => {
