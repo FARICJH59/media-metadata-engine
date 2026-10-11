@@ -2,6 +2,7 @@ import type { Env, ProcessingMessage } from "./types";
 import { handleIngest } from "./handlers/ingest";
 import { handleStatus } from "./handlers/status";
 import { handleQueueBatch } from "./handlers/processor";
+import { dispatchReadyOutbox } from "./handlers/outbox";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -20,5 +21,9 @@ export default {
 
   async queue(batch: MessageBatch<ProcessingMessage>, env: Env): Promise<void> {
     await handleQueueBatch(batch, env);
+  },
+
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(dispatchReadyOutbox(env, 100));
   },
 };
